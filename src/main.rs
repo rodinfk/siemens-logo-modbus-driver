@@ -73,11 +73,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut client = tcp::connect(addr).await?;
 
-    let mut logo = LogoState {
-        inputs: vec![false; INPUTS_COUNT],
-        outputs: vec![false; OUTPUTS_COUNT],
-        flags: Vec::new(),
-    };
 
     loop {
         logo.inputs = client
