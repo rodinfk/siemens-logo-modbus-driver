@@ -1,5 +1,6 @@
 use std::io::{stdout, Write};
 use std::net::SocketAddr;
+use std::sync::mpsc::{self, Sender};
 
 use crossterm::{
     cursor::MoveToColumn,
@@ -11,6 +12,8 @@ use tokio::time::{sleep, Duration};
 use tokio_modbus::client::Context;
 use tokio_modbus::prelude::*;
 
+mod view;
+
 const LOGO_SOCKET: &str = "192.168.39.201:502";
 
 
@@ -19,28 +22,17 @@ const OUTPUTS_COUNT: usize = 20;
 
 const LOGO_Q_START: u16 = 8193;
 
-mod flag {
-    pub const M1: u16 = 8257;
-    pub const M2: u16 = 8258;
-    pub const M3: u16 = 8259;
-    pub const M4: u16 = 8260;
-    pub const M5: u16 = 8261;
-    pub const M6: u16 = 8262;
-    pub const M7: u16 = 8263;
-    pub const M8: u16 = 8264;
-    pub const M9: u16 = 8265;
-    pub const M10: u16 = 8266;
-    pub const M11: u16 = 8267;
-    pub const M12: u16 = 8268;
-    pub const M13: u16 = 8269;
-    pub const M14: u16 = 8270;
-    pub const M15: u16 = 8271;
-    pub const M16: u16 = 8272;
-    pub const M17: u16 = 8273;
-    pub const M18: u16 = 8274;
-    pub const M19: u16 = 8275;
-    pub const M20: u16 = 8276;
+enum Changes {
+    Input {
+        address: usize,
+        value: bool,
+    },
+    Output {
+        address: usize,
+        value: bool,   
+    },
 }
+
 
 
 struct LogoDriver {
@@ -48,10 +40,20 @@ struct LogoDriver {
     
     inputs: Vec<bool>,
     outputs: Vec<bool>,
-    flags: Vec<bool>,
+
+    tx: Sender<Changes>
 }
 
 impl LogoDriver {
+    fn new(client: Context, tx: Sender<Changes>) -> Self {
+        Self {
+            client, 
+            inputs: vec![false; INPUTS_COUNT],
+            outputs: vec![false; OUTPUTS_COUNT],
+            tx: tx,   
+        }
+    }
+
     async fn reverse_q(&mut self, address: usize,) -> Result<(), Box<dyn std::error::Error>> {
         let value = !self.outputs[address];
 
@@ -71,15 +73,17 @@ impl LogoDriver {
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let addr: SocketAddr = LOGO_SOCKET.parse()?;
 
+    let (tx, rx) = mpsc::channel::<Changes>(); 
     let mut client = tcp::connect(addr).await?;
 
+    let mut logo = LogoDriver::new(client, tx);
 
     loop {
-        logo.inputs = client
+        logo.inputs = logo.client
             .read_discrete_inputs(0, logo.inputs.len() as u16)
              .await??;
         
-        logo.outputs = client
+        logo.outputs = logo.client
             .read_coils(LOGO_Q_START, logo.outputs.len() as u16)
             .await??;
         
@@ -94,6 +98,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         for value in &logo.inputs {
             print!("{} ", if *value { 1 } else { 0 });
         }
+
+        for value in &logo.outputs {
+            print!("{} ", if *value { 1 } else { 0 });
+        }
+        
+
 
         stdout().flush()?;
 
