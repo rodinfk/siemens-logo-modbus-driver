@@ -3,6 +3,7 @@ use std::time::Duration;
 use eframe::egui::{self, Color32, Vec2};
 use tokio::sync::{mpsc, watch};
 
+const INPUTS_COUNT: usize = 24;
 const OUTPUTS_COUNT: usize = 20;
 
 #[derive(Clone)]
@@ -99,15 +100,15 @@ impl Window {
         self.messages.push(message);
     }
 
-    fn draw_signals(ui: &mut egui::Ui, id: &str, title: &str, prefix: &str, values: &[bool]) {
+    fn draw_signals(ui: &mut egui::Ui, id: &str, title: &str, values: &[bool]) {
         ui.heading(title);
         egui::Grid::new(id)
-            .num_columns(12)
+            .num_columns(INPUTS_COUNT)
             .spacing(Vec2::new(6.0, 6.0))
             .show(ui, |ui| {
                 for (index, &value) in values.iter().enumerate() {
                     ui.vertical(|ui| {
-                        ui.label(format!("{prefix}{}", index + 1));
+                        ui.label(format!("{}", index + 1));
                         let (rect, _) =
                             ui.allocate_exact_size(Vec2::splat(20.0), egui::Sense::hover());
                         let color = if value {
@@ -117,10 +118,6 @@ impl Window {
                         };
                         ui.painter().rect_filled(rect, 3.0, color);
                     });
-
-                    if (index + 1) % 12 == 0 {
-                        ui.end_row();
-                    }
                 }
             });
     }
@@ -129,8 +126,6 @@ impl Window {
 fn parse_output_address(address: &str) -> Option<usize> {
     let number = address
         .trim()
-        .strip_prefix('Q')
-        .or_else(|| address.trim().strip_prefix('q'))?
         .parse::<usize>()
         .ok()?;
 
@@ -142,9 +137,9 @@ impl eframe::App for Window {
         self.state = self.state_rx.borrow_and_update().clone();
         ui.ctx().request_repaint_after(Duration::from_millis(16));
 
-        Self::draw_signals(ui, "inputs", "Inputs", "I", &self.state.inputs);
+        Self::draw_signals(ui, "inputs", "Inputs", &self.state.inputs);
         ui.separator();
-        Self::draw_signals(ui, "outputs", "Outputs", "Q", &self.state.outputs);
+        Self::draw_signals(ui, "outputs", "Outputs", &self.state.outputs);
         ui.separator();
 
         ui.horizontal(|ui| {
