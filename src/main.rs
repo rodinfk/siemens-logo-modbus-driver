@@ -8,6 +8,7 @@ use tokio_modbus::client::Context;
 use tokio_modbus::prelude::*;
 
 mod view;
+mod driver;
 
 const LOGO_SOCKET: &str = "192.168.1.201:502";
 const LOGO_UNIT_ID: u8 = 255;
